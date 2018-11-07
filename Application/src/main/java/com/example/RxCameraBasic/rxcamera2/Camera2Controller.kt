@@ -274,6 +274,8 @@ class Camera2Controller(private val context: Context,
             val cameraId = CameraStrategy.switchCamera(cameraManager, cameraParams!!.cameraId)
             cameraParams = getCameraParams(cameraId!!)
             subscribe()
+
+            onSurfaceTextureAvailable.onNext(textureView.surfaceTexture)
             // waiting for textureView to be measured
         } catch (e: CameraAccessException) {
             onError(e)
@@ -410,15 +412,24 @@ class Camera2Controller(private val context: Context,
         }
 
         mediaRecorder?.apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
-            setVideoSource(MediaRecorder.VideoSource.SURFACE)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            /*DEBUG*/showLog("\tsetOutputFormat" + MediaRecorder.OutputFormat.MPEG_4)
+            setAudioSource(MediaRecorder.AudioSource.CAMCORDER)//todo??MIC
+            /*DEBUG*/showLog("\tsetAudioSource" + MediaRecorder.AudioSource.CAMCORDER)
+            setVideoSource(MediaRecorder.VideoSource.SURFACE)//todo??CAMERA
+            /*DEBUG*/showLog("\tsetVideoSource"+MediaRecorder.VideoSource.SURFACE)
             setOutputFile(nextVideoAbsolutePath)
+            /*DEBUG*/showLog("\tsetOutputFile"+nextVideoAbsolutePath)
             setVideoEncodingBitRate(10000000)
+            /*DEBUG*/showLog("\tsetVideoEncodingBitRate 10000000")
             setVideoFrameRate(30)
+            /*DEBUG*/showLog("\tsetVideoFrameRate 30")
             setVideoSize(cameraParams!!.videoSize.width, cameraParams!!.videoSize.height)
+            /*DEBUG*/showLog("\tsetVideoSize" + cameraParams!!.videoSize)
             setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+            /*DEBUG*/showLog("\tsetVideoEncoder" + MediaRecorder.VideoEncoder.H264)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            /*DEBUG*/showLog("\tsetAudioEncoder" + MediaRecorder.AudioEncoder.AAC)
             prepare()
         }
     }

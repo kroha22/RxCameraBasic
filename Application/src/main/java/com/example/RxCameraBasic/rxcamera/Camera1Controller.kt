@@ -166,12 +166,12 @@ class Camera1Controller(private val context: Context,
 
         mediaRecorder?.apply {
             setCamera(camera!!.nativeCamera)
-            setAudioSource(MediaRecorder.AudioSource.CAMCORDER)
-            setVideoSource(MediaRecorder.VideoSource.CAMERA)
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setAudioSource(MediaRecorder.AudioSource.CAMCORDER)//todo??MIC
+            setVideoSource(MediaRecorder.VideoSource.CAMERA)//todo??SURFACE
             setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH))
             setOutputFile(nextVideoAbsolutePath)
             setPreviewDisplay(setupVideoSurfaces())
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setVideoEncodingBitRate(10000000)
             setVideoFrameRate(30)
             setVideoSize(cameraParams!!.videoSize.width, cameraParams!!.videoSize.height)
