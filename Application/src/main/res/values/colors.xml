@@ -5,7 +5,7 @@
     <color name="colorAccent">#FF4081</color>
     <color name="shutter_bg">#9aacb3</color>
     <color name="photo_btn_color">#2c3436</color>
-    <color name="video_btn_pressed">#613033</color>
+    <color name="video_btn_pressed">#bea8a8</color>
     <color name="video_btn_not_pressed">#e4737a</color>
 
     <color name="ic_launcher_background">#E3A275</color>
