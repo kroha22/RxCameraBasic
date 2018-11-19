@@ -141,7 +141,7 @@ abstract class CameraControllerBase(private val context: Context,
     }
 
     internal fun setVideoBtnState(isPressed: Boolean) {
-        /*DEBUG*/showLog("\tsetVideoBtnState")
+        /*DEBUG*/showLog("\tsetVideoBtnState " + isPressed)
         isRecordingVideo = isPressed
         videoButtonCallback.onClick(isPressed)
     }

@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.*
+import android.media.CamcorderProfile
 import android.media.ImageReader
 import android.media.MediaRecorder
 import android.util.Pair
@@ -15,16 +16,16 @@ import android.view.WindowManager
 import com.example.RxCameraBasic.AutoFitTextureView
 import com.example.RxCameraBasic.CameraControllerBase
 import com.example.RxCameraBasic.rxcamera2.CameraRxWrapper.CaptureSessionData
+import com.example.RxCameraBasic.rxcamera2.CameraRxWrapper.fromSetRepeatingRequest
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.functions.BiFunction
 import io.reactivex.schedulers.Schedulers
 import java.io.IOException
 import java.util.*
-import kotlin.collections.ArrayList
 
 @TargetApi(21)
-class Camera2Controller(private val context: Context,
+class Camera2Controller(context: Context,
                         private val callback: Callback,
                         photoFileUrl: String,
                         lifecycle: Lifecycle,
@@ -158,33 +159,27 @@ class Camera2Controller(private val context: Context,
                 .subscribe({ _ -> unsubscribe() }, { this.onError(it) })
         )
 
-        // реакция на onStartVideo
-        val surfaces: ArrayList<Surface> = ArrayList()
+        // реакция на onStartVideo TODO check video
         compositeDisposable.add(Observable.combineLatest(previewObservable, onStartVideoClick, BiFunction { state: CaptureSessionData, _: Any -> state })
                 .firstElement().toObservable()
                 .doOnNext { _ -> showLog("\ton start video") }
                 .doOnNext { closeCaptureSession(it) }
                 .doOnNext { setUpMediaRecorder() }
-                .doOnNext {
-                    surfaces.clear()
-                    surfaces.addAll(setupVideoSurfaces())
-                }
-                .flatMap { captureSessionData -> CameraRxWrapper.createCaptureSession(captureSessionData.session.device, surfaces) }
-                .flatMap { captureSession ->
-                    previewObservable   //todo ?????????
-                            .doOnNext { captureSessionData -> captureSessionData.setSession(captureSession.second) }
-                            .doOnNext { captureSessionData ->
-                                val previewRequestBuilder = captureSessionData.session.device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
-                                    for (s in surfaces) {
-                                        addTarget(s)
-                                    }
-                                }
-                                captureSessionData.setRepeatingRequest(previewRequestBuilder.build())
+                .subscribe({ captureSessionData ->
+                    CameraRxWrapper.createCaptureSession(captureSessionData.session.device, Arrays.asList<Surface>(surface, mediaRecorder!!.surface))
+                            .filter { pair -> pair.first === CameraRxWrapper.CaptureSessionStateEvents.ON_CONFIGURED }
+                            .map { pair -> pair.second }
+                            .doOnNext { session -> captureSessionData.setSession(session) }
+                            .doOnNext { session ->
+                                fromSetRepeatingRequest(session, createVideoCaptureBuilder(session.device).build())
                             }
-                            .share()
-                }
-                .doOnNext { startRecordingVideo() }
-                .subscribe({ _ -> unsubscribe() }, { this.onError(it) })
+                            .subscribe({ _ ->
+                                setVideoBtnState(true)
+                                startRecordingVideo()
+                            },
+                                    { this.onError(it) })
+                },
+                        { this.onError(it) })
         )
 
         // реакция на onStopVideo
@@ -192,22 +187,19 @@ class Camera2Controller(private val context: Context,
                 .firstElement().toObservable()
                 .doOnNext { _ -> showLog("\ton stop video") }
                 .doOnNext { captureSessionData ->
-                    setVideoBtnState(false)
                     stopRecordingVideo()
                     closeCaptureSession(captureSessionData)
-                    setupSurface(textureView.surfaceTexture)
                 }
-                .flatMap { captureSessionData -> CameraRxWrapper.createCaptureSession(captureSessionData.session.device, listOf(surface!!)) }
-                .flatMap { captureSession ->
-                    previewObservable   //todo ?????????
-                            .doOnNext { captureSessionData -> captureSessionData.setSession(captureSession.second) }
-                            .doOnNext { captureSessionData ->
-                                val previewRequestBuilder = createPreviewBuilder(captureSessionData.session.device)
-                                captureSessionData.setRepeatingRequest(previewRequestBuilder.build())
+                .subscribe({ captureSessionData ->
+                    CameraRxWrapper.createCaptureSession(captureSessionData.session.device, listOf(surface!!))
+                            .filter { pair -> pair.first === CameraRxWrapper.CaptureSessionStateEvents.ON_CONFIGURED }
+                            .map { pair -> pair.second }
+                            .doOnNext { session -> captureSessionData.setSession(session) }
+                            .doOnNext { session ->
+                                fromSetRepeatingRequest(session, createPreviewBuilder(session, surface).build())
                             }
-                            .share()
-                }
-                .subscribe({ _ -> unsubscribe() }, { this.onError(it) })
+                            .subscribe({ _ -> setVideoBtnState(false)}, { this.onError(it) })
+                }, { this.onError(it) })
         )
     }
 
@@ -230,19 +222,10 @@ class Camera2Controller(private val context: Context,
         return CameraParams(cameraId, characteristics, previewSize, videoSize, characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION))
     }
 
-    private fun setupVideoSurfaces(): ArrayList<Surface> {
-        /*DEBUG*/showLog("\tsetupVideoSurfaces")
-
-        val texture = textureView.surfaceTexture.apply {
-            setDefaultBufferSize(cameraParams!!.previewSize.width, cameraParams!!.previewSize.height)
-        }
-        // Set up Surface for camera preview and MediaRecorder
-        val previewSurface = Surface(texture)
-        val recorderSurface = mediaRecorder!!.surface
-        return ArrayList<Surface>().apply {
-            add(previewSurface)
-            add(recorderSurface)
-        }
+    private fun setupSurface(surfaceTexture: SurfaceTexture) {
+        /*DEBUG*/showLog("\tsetupSurface $surfaceTexture")
+        surfaceTexture.setDefaultBufferSize(cameraParams!!.previewSize.width, cameraParams!!.previewSize.height)
+        surface = Surface(surfaceTexture)
     }
 
     private fun closeCaptureSession(captureSessionData: CaptureSessionData) {
@@ -252,19 +235,14 @@ class Camera2Controller(private val context: Context,
     }
 
     private fun onError(throwable: Throwable) {
-        /*DEBUG*/showLog("\tonError" + throwable.message)
+        /*DEBUG*/showLog("\tonError: " + throwable.message + "\n" + throwable.cause)
+
         unsubscribe()
         when (throwable) {
             is CameraAccessException -> callback.onCameraAccessException()
             is OpenCameraException -> callback.onCameraOpenException(throwable)
             else -> callback.onException(throwable)
         }
-    }
-
-    private fun setupSurface(surfaceTexture: SurfaceTexture) {
-        /*DEBUG*/showLog("\tsetupSurface")
-        surfaceTexture.setDefaultBufferSize(cameraParams!!.previewSize.width, cameraParams!!.previewSize.height)
-        surface = Surface(surfaceTexture)
     }
 
     private fun switchCameraInternal() {
@@ -350,11 +328,18 @@ class Camera2Controller(private val context: Context,
     }
 
     @Throws(CameraAccessException::class)
-    internal fun createPreviewBuilder(cameraDevice: CameraDevice): CaptureRequest.Builder {
-        /*DEBUG*/showLog("\tcreatePreviewBuilder")
-        val builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+    internal fun createVideoCaptureBuilder(cameraDevice: CameraDevice): CaptureRequest.Builder {
+        /*DEBUG*/showLog("\tcreateVideoCaptureBuilder")
+
+        val builder: CaptureRequest.Builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
+
         builder.addTarget(surface)
-        builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
+        builder.addTarget(imageReader!!.surface)
+        setup3Auto(builder)
+
+        val rotation = windowManager.defaultDisplay.rotation
+        builder.set(CaptureRequest.JPEG_ORIENTATION, CameraOrientationHelper.getJpegOrientation(cameraParams!!.cameraCharacteristics, rotation))
+
         return builder
     }
 
@@ -403,47 +388,45 @@ class Camera2Controller(private val context: Context,
             nextVideoAbsolutePath = getVideoFilePath()
         }
 
-        val rotation = windowManager.defaultDisplay.rotation
-        when (cameraParams!!.sensorOrientation) {
-            CameraOrientationHelper.SENSOR_ORIENTATION_DEFAULT_DEGREES ->
-                mediaRecorder?.setOrientationHint(CameraOrientationHelper.getDefaultOrientation(rotation))
-            CameraOrientationHelper.SENSOR_ORIENTATION_INVERSE_DEGREES ->
-                mediaRecorder?.setOrientationHint(CameraOrientationHelper.getInverseOrientation(rotation))
-        }
-
-        mediaRecorder?.apply {
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            /*DEBUG*/showLog("\tsetOutputFormat" + MediaRecorder.OutputFormat.MPEG_4)
+        mediaRecorder!!.apply {
+            setVideoSource(MediaRecorder.VideoSource.SURFACE)
             setAudioSource(MediaRecorder.AudioSource.CAMCORDER)//todo??MIC
-            /*DEBUG*/showLog("\tsetAudioSource" + MediaRecorder.AudioSource.CAMCORDER)
-            setVideoSource(MediaRecorder.VideoSource.SURFACE)//todo??CAMERA
-            /*DEBUG*/showLog("\tsetVideoSource"+MediaRecorder.VideoSource.SURFACE)
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setOutputFile(nextVideoAbsolutePath)
-            /*DEBUG*/showLog("\tsetOutputFile"+nextVideoAbsolutePath)
+
+            val rotation = windowManager.defaultDisplay.rotation
+            when (cameraParams!!.sensorOrientation) {
+                CameraOrientationHelper.SENSOR_ORIENTATION_DEFAULT_DEGREES ->
+                    mediaRecorder!!.setOrientationHint(CameraOrientationHelper.getDefaultOrientation(rotation))
+                CameraOrientationHelper.SENSOR_ORIENTATION_INVERSE_DEGREES ->
+                    mediaRecorder!!.setOrientationHint(CameraOrientationHelper.getInverseOrientation(rotation))
+            }
+
             setVideoEncodingBitRate(10000000)
-            /*DEBUG*/showLog("\tsetVideoEncodingBitRate 10000000")
             setVideoFrameRate(30)
-            /*DEBUG*/showLog("\tsetVideoFrameRate 30")
             setVideoSize(cameraParams!!.videoSize.width, cameraParams!!.videoSize.height)
-            /*DEBUG*/showLog("\tsetVideoSize" + cameraParams!!.videoSize)
             setVideoEncoder(MediaRecorder.VideoEncoder.H264)
-            /*DEBUG*/showLog("\tsetVideoEncoder" + MediaRecorder.VideoEncoder.H264)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            /*DEBUG*/showLog("\tsetAudioEncoder" + MediaRecorder.AudioEncoder.AAC)
             prepare()
         }
     }
 
     private fun startRecordingVideo() {
-        /*DEBUG*/showLog("\tstartRecordingVideo")
-        setVideoBtnState(true)
-        mediaRecorder?.start()
+        showLog("\tstart recording video")
+
+        mediaRecorder!!.start()
     }
 
     private fun stopRecordingVideo() {
-        /*DEBUG*/showLog("\tstopRecordingVideo")
-        mediaRecorder?.apply {
-            stop()
+        showLog("\tstop recording video")
+
+        setVideoBtnState(false)
+        mediaRecorder!!.apply {
+            try {
+                stop()
+            } catch (e: Exception) {
+                callback.onMessage("Empty video")//todo???
+            }
             reset()
         }
 

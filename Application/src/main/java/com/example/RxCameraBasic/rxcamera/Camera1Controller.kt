@@ -14,6 +14,7 @@ import android.util.Pair
 import android.view.Surface
 import com.example.RxCameraBasic.AutoFitTextureView
 import com.example.RxCameraBasic.CameraControllerBase
+import com.example.RxCameraBasic.rxcamera2.CameraOrientationHelper
 import com.example.RxCameraBasic.rxcamera2.ConvergeWaiter
 import com.example.RxCameraBasic.rxcamera2.OpenCameraException
 import io.reactivex.Observable
@@ -160,17 +161,26 @@ class Camera1Controller(private val context: Context,
             nextVideoAbsolutePath = getVideoFilePath()
         }
 
-        createVideoFile()
+        createVideoFile()//todo???
 
         camera!!.nativeCamera.unlock()
 
         mediaRecorder?.apply {
             setCamera(camera!!.nativeCamera)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioSource(MediaRecorder.AudioSource.CAMCORDER)//todo??MIC
             setVideoSource(MediaRecorder.VideoSource.CAMERA)//todo??SURFACE
+            setAudioSource(MediaRecorder.AudioSource.CAMCORDER)//todo??MIC
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH))
             setOutputFile(nextVideoAbsolutePath)
+
+            /*todo??? val rotation = windowManager.defaultDisplay.rotation
+            when (cameraParams!!.sensorOrientation) {
+                CameraOrientationHelper.SENSOR_ORIENTATION_DEFAULT_DEGREES ->
+                    mediaRecorder!!.setOrientationHint(CameraOrientationHelper.getDefaultOrientation(rotation))
+                CameraOrientationHelper.SENSOR_ORIENTATION_INVERSE_DEGREES ->
+                    mediaRecorder!!.setOrientationHint(CameraOrientationHelper.getInverseOrientation(rotation))
+            }*/
+
             setPreviewDisplay(setupVideoSurfaces())
             setVideoEncodingBitRate(10000000)
             setVideoFrameRate(30)

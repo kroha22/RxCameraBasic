@@ -9,5 +9,6 @@
     <color name="video_btn_not_pressed">#e4737a</color>
 
     <color name="ic_launcher_background">#E3A275</color>
+    <color name="colorBlack">#020202</color>
 
 </resources>
