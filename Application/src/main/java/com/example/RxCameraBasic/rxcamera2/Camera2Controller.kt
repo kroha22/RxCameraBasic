@@ -86,10 +86,15 @@ class Camera2Controller(context: Context,
                 .map { pair -> pair.second }
                 .share()
 
+        subscribe(openCameraObservable, closeCameraObservable)
+    }
+
+    fun subscribe(openCameraObservable: Observable<CameraDevice>, closeCameraObservable: Observable<CameraDevice>?) {
+
         // после успешного открытия камеры откроем сессию
         val createCaptureSessionObservable = openCameraObservable
                 .flatMap { cameraDevice ->
-                    CameraRxWrapper.createCaptureSession(cameraDevice, Arrays.asList<Surface>(surface, imageReader!!.surface))
+                    CameraRxWrapper.createCaptureSession( cameraDevice, getAvailableSurfaces())
                 }
                 .share()
 
@@ -109,8 +114,14 @@ class Camera2Controller(context: Context,
         val previewObservable = captureSessionConfiguredObservable
                 .flatMap { cameraCaptureSession ->
                     showLog("\tstartPreview")
+
                     val previewBuilder = createPreviewBuilder(cameraCaptureSession, surface)
-                    CameraRxWrapper.fromSetRepeatingRequest(cameraCaptureSession, previewBuilder.build())
+                    fromSetRepeatingRequest(cameraCaptureSession, previewBuilder.build())
+                }
+                .doFinally {
+                    if (isRecordingVideo){
+                        //todo???startRecordingVideo()
+                    }
                 }
                 .share()
 
@@ -159,25 +170,17 @@ class Camera2Controller(context: Context,
                 .subscribe({ _ -> unsubscribe() }, { this.onError(it) })
         )
 
-        // реакция на onStartVideo TODO check video
+        // реакция на onStartVideo
         compositeDisposable.add(Observable.combineLatest(previewObservable, onStartVideoClick, BiFunction { state: CaptureSessionData, _: Any -> state })
                 .firstElement().toObservable()
                 .doOnNext { _ -> showLog("\ton start video") }
-                .doOnNext { closeCaptureSession(it) }
+                .doOnNext { _ -> setVideoBtnState(true)}
                 .doOnNext { setUpMediaRecorder() }
-                .subscribe({ captureSessionData ->
-                    CameraRxWrapper.createCaptureSession(captureSessionData.session.device, Arrays.asList<Surface>(surface, mediaRecorder!!.surface))
-                            .filter { pair -> pair.first === CameraRxWrapper.CaptureSessionStateEvents.ON_CONFIGURED }
-                            .map { pair -> pair.second }
-                            .doOnNext { session -> captureSessionData.setSession(session) }
-                            .doOnNext { session ->
-                                fromSetRepeatingRequest(session, createVideoCaptureBuilder(session.device).build())
-                            }
-                            .subscribe({ _ ->
-                                setVideoBtnState(true)
-                                startRecordingVideo()
-                            },
-                                    { this.onError(it) })
+                .doOnNext { closeCaptureSession(it) }
+                .flatMap { _ -> captureSessionClosedObservable }
+                .subscribe({ captureSession ->
+                    subscribe(Observable.create{it.onNext(captureSession.device)}, closeCameraObservable)
+                   // onSurfaceTextureAvailable.onNext(textureView.surfaceTexture)
                 },
                         { this.onError(it) })
         )
@@ -186,21 +189,23 @@ class Camera2Controller(context: Context,
         compositeDisposable.add(Observable.combineLatest(previewObservable, onStopVideoClick, BiFunction { state: CaptureSessionData, _: Any -> state })
                 .firstElement().toObservable()
                 .doOnNext { _ -> showLog("\ton stop video") }
-                .doOnNext { captureSessionData ->
-                    stopRecordingVideo()
-                    closeCaptureSession(captureSessionData)
-                }
-                .subscribe({ captureSessionData ->
-                    CameraRxWrapper.createCaptureSession(captureSessionData.session.device, listOf(surface!!))
-                            .filter { pair -> pair.first === CameraRxWrapper.CaptureSessionStateEvents.ON_CONFIGURED }
-                            .map { pair -> pair.second }
-                            .doOnNext { session -> captureSessionData.setSession(session) }
-                            .doOnNext { session ->
-                                fromSetRepeatingRequest(session, createPreviewBuilder(session, surface).build())
-                            }
-                            .subscribe({ _ -> setVideoBtnState(false)}, { this.onError(it) })
+                .doOnNext { _ -> setVideoBtnState(false)}
+                .doOnNext { _ -> stopRecordingVideo()}
+                .doOnNext { closeCaptureSession(it) }
+                .flatMap { _ -> captureSessionClosedObservable }
+                .subscribe({ captureSession ->
+                    subscribe(Observable.create{it.onNext(captureSession.device)}, closeCameraObservable)
+                    // onSurfaceTextureAvailable.onNext(textureView.surfaceTexture)
                 }, { this.onError(it) })
         )
+    }
+
+    fun getAvailableSurfaces(): List<Surface> {
+        return if (isRecordingVideo) {
+            Arrays.asList<Surface>(surface, imageReader!!.surface, mediaRecorder!!.surface)
+        } else {
+            Arrays.asList<Surface>(surface, imageReader!!.surface)
+        }
     }
 
     @Throws(CameraAccessException::class)
@@ -320,27 +325,25 @@ class Camera2Controller(context: Context,
 
     @Throws(CameraAccessException::class)
     internal fun createPreviewBuilder(captureSession: CameraCaptureSession, previewSurface: Surface?): CaptureRequest.Builder {
-        /*DEBUG*/showLog("\tcreatePreviewBuilder")
-        val builder = captureSession.device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-        builder.addTarget(previewSurface!!)
-        setup3Auto(builder)
-        return builder
-    }
+        /*DEBUG*/showLog("\tcreatePreviewBuilder, isRecordingVideo $isRecordingVideo")
 
-    @Throws(CameraAccessException::class)
-    internal fun createVideoCaptureBuilder(cameraDevice: CameraDevice): CaptureRequest.Builder {
-        /*DEBUG*/showLog("\tcreateVideoCaptureBuilder")
+        if (isRecordingVideo) {
+            val builder: CaptureRequest.Builder = captureSession.device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
 
-        val builder: CaptureRequest.Builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
+            builder.addTarget(previewSurface)
+            builder.addTarget(mediaRecorder!!.surface)
+            setup3Auto(builder)
 
-        builder.addTarget(surface)
-        builder.addTarget(imageReader!!.surface)
-        setup3Auto(builder)
+            val rotation = windowManager.defaultDisplay.rotation
+            builder.set(CaptureRequest.JPEG_ORIENTATION, CameraOrientationHelper.getJpegOrientation(cameraParams!!.cameraCharacteristics, rotation))
 
-        val rotation = windowManager.defaultDisplay.rotation
-        builder.set(CaptureRequest.JPEG_ORIENTATION, CameraOrientationHelper.getJpegOrientation(cameraParams!!.cameraCharacteristics, rotation))
-
-        return builder
+            return builder
+        } else {
+            val builder = captureSession.device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+            builder.addTarget(previewSurface)
+            setup3Auto(builder)
+            return builder
+        }
     }
 
     private fun setup3Auto(builder: CaptureRequest.Builder) {
@@ -420,7 +423,6 @@ class Camera2Controller(context: Context,
     private fun stopRecordingVideo() {
         showLog("\tstop recording video")
 
-        setVideoBtnState(false)
         mediaRecorder!!.apply {
             try {
                 stop()
