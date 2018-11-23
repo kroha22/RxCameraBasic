@@ -41,63 +41,32 @@ abstract class CameraControllerBase(private val context: Context,
     private val lifecycleObserver = object : DefaultLifecycleObserver {
 
         override fun onCreate(owner: LifecycleOwner) {
-
-            showLog("\tonCreate")
+            log("onCreate")
 
             onCreate()
-
-            textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-
-                override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-                    showLog("\tonSurfaceTextureAvailable")
-                    onSurfaceTextureAvailable.onNext(surface)
-                }
-
-                override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
-                    showLog("\tonSurfaceTextureSizeChanged")
-                    onSurfaceTextureAvailable.onNext(surface)
-                    //NO-OP
-                }
-
-                override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
-                    showLog("\tonSurfaceTextureDestroyed")
-                    return true
-                }
-
-                override fun onSurfaceTextureUpdated(texture: SurfaceTexture) {}
-            }
-
-            // For some reasons onSurfaceSizeChanged is not always called, this is a workaround
-            textureView.addOnLayoutChangeListener { v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
-                showLog("\tonLayoutChange")
-                if (textureView.isAvailable) {
-                    showLog("\ttextureView.isAvailable()")
-                    onSurfaceTextureAvailable.onNext(textureView.surfaceTexture)
-                }
-            }
+            initSurfaceTextureListener()
         }
 
         override fun onResume(owner: LifecycleOwner) {
-            showLog("\tonResume")
+            log("onResume")
 
             subscribe()
-
-            // When the screen is turned off and turned back on, the SurfaceTexture is already
-            // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
-            // a camera and start preview from here (otherwise, we wait until the surface is ready in
-            // the SurfaceTextureListener).
+            /*
+            Когда выкл/вкл экран, если SurfaceTexture уже доступен, то «onSurfaceTextureAvailable» не будет вызываться
+             */
             if (textureView.isAvailable) {
-                showLog("\ttextureView.isAvailable()")
+                log("textureView.isAvailable()")
+
                 onSurfaceTextureAvailable.onNext(textureView.surfaceTexture)
             }
         }
 
 
         override fun onPause(owner: LifecycleOwner) {
-            showLog("\tonPause")
+            log("onPause")
+
             onPauseSubject.onNext(this)
         }
-
     }
 
     //----------------------------------------------------------------------------------------------
@@ -107,47 +76,57 @@ abstract class CameraControllerBase(private val context: Context,
     }
 
     fun takePhoto() {
-        /*DEBUG*/showLog("\tonPhotoClick")
+        log("onPhotoClick")
+        
         onShutterClick.onNext(this)
     }
 
     fun makeVideo() {
-        /*DEBUG*/showLog("\tonVideoClick")
+        log("onVideoClick")
+        
         if (isRecordingVideo) onStopVideoClick.onNext(this) else onStartVideoClick.onNext(this)
     }
 
     fun switchCamera() {
-        /*DEBUG*/showLog("\tonSwitchCameraClick")
+        log("onSwitchCameraClick")
+        
         onSwitchCameraClick.onNext(this)
     }
-    /**
-     * Flow is configured in this method
-     */
+
+    abstract fun onCreate()    
+    
     internal open fun subscribe(){
-        /*DEBUG*/showLog("\tsubscribe")
+        log("subscribe")
+        
         compositeDisposable.clear()
     }
 
     internal fun unsubscribe() {
-        /*DEBUG*/showLog("\tunsubscribe")
+        log("unsubscribe")
+        
         compositeDisposable.clear()
     }
 
-    abstract fun onCreate()
-
-    internal fun initMediaRecorder() {
-        /*DEBUG*/showLog("\tinitMediaRecorder")
+    internal fun initMediaRecorder() {       
+        log("initMediaRecorder")
+        
         mediaRecorder = MediaRecorder()
     }
 
+    internal fun closeMediaRecorder() {
+        log("closeMediaRecorder")
+
+        mediaRecorder?.reset()
+        mediaRecorder?.release()
+        mediaRecorder = null
+    }
+
     internal fun setVideoBtnState(isPressed: Boolean) {
-        /*DEBUG*/showLog("\tsetVideoBtnState " + isPressed)
         isRecordingVideo = isPressed
         videoButtonCallback.onClick(isPressed)
     }
 
     internal fun getVideoFilePath(): String {
-        /*DEBUG*/showLog("\tgetVideoFilePath")
         val filename = "${System.currentTimeMillis()}.mp4"
         val dir = context.getExternalFilesDir(null)
 
@@ -158,21 +137,50 @@ abstract class CameraControllerBase(private val context: Context,
         }
     }
 
-    internal fun closeMediaRecorder() {
-        /*DEBUG*/showLog("\tcloseMediaRecorder")
-        mediaRecorder?.reset()
-        mediaRecorder?.release()
-        mediaRecorder = null
+    fun initSurfaceTextureListener() {
+        textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+
+            override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+                log("onSurfaceTextureAvailable")
+
+                onSurfaceTextureAvailable.onNext(surface)
+            }
+
+            override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
+                log("onSurfaceTextureSizeChanged")
+
+                onSurfaceTextureAvailable.onNext(surface)
+            }
+
+            override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+                log("onSurfaceTextureDestroyed")
+
+                return true
+            }
+
+            override fun onSurfaceTextureUpdated(texture: SurfaceTexture) {}
+        }
+
+        // По некоторым причинам onSurfaceSizeChanged не всегда вызывается, это обходное решение
+        textureView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            log("onLayoutChange")
+
+            if (textureView.isAvailable) {
+                log("textureView.isAvailable()")
+
+                onSurfaceTextureAvailable.onNext(textureView.surfaceTexture)
+            }
+        }
     }
 
     //----------------------------------------------------------------------------------------------
 
     companion object {
 
-        internal val TAG = CameraControllerBase::class.java.name
+        private val TAG = CameraControllerBase::class.java.name
 
-        internal fun showLog(msg: String) {
-            Log.d(TAG + "!!!!!!!", msg)
+        internal fun log(msg: String) {
+            MainActivity.log("$TAG: $msg")
         }
 
         internal fun contains(modes: IntArray?, mode: Int): Boolean {

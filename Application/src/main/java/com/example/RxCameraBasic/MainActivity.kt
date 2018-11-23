@@ -1,6 +1,8 @@
 package com.example.RxCameraBasic
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.DialogInterface
 import android.os.Build
 import android.os.Bundle
 import android.support.v4.content.ContextCompat
@@ -17,6 +19,7 @@ class MainActivity : AppCompatActivity() {
 
     private var cameraController: CameraControllerBase? = null
     private var focusIndicator: View? = null
+    private lateinit var photoBtn: ImageView
     private lateinit var videoBtn: ImageView
 
     private val cameraControllerCallback = object : CameraControllerBase.Callback {
@@ -50,21 +53,31 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onCameraAccessException() {
-            Log.d(TAG, "Camera Access Exception")
-            setResult(Activity.RESULT_CANCELED)
-            finish()
+            log("Camera Access Exception")
+
+            onError("Ошибка при работе камеры")
         }
 
         override fun onCameraOpenException(exception: Exception) {
-            Log.d(TAG, "Camera Open Exception: " + exception.message)
-            setResult(Activity.RESULT_CANCELED)
-            finish()
+            log("Camera Open Exception: " + exception.message)
+
+            onError("Ошибка при открытии камеры.")
         }
 
         override fun onException(throwable: Throwable) {
-            throwable.printStackTrace()
+            log("Camera Exception: " + throwable.message)
+
+            onError("Ошибка приложения. ${throwable.message}")
+        }
+
+        private fun onError(errorMsg: String) {
             setResult(Activity.RESULT_CANCELED)
-            finish()
+
+            AlertDialog.Builder(this@MainActivity)
+                    .setMessage(errorMsg)
+                    .setPositiveButton("Закрыть") { _, _ ->  this@MainActivity.finish() }
+                    .create()
+                    .show()
         }
     }
 
@@ -72,8 +85,10 @@ class MainActivity : AppCompatActivity() {
         override fun onClick(isPressed: Boolean) {
             if (isPressed){
                 videoBtn.setColorFilter(ContextCompat.getColor(this@MainActivity, R.color.video_btn_pressed))
+                photoBtn.isEnabled = false
             } else {
                 videoBtn.setColorFilter(ContextCompat.getColor(this@MainActivity, R.color.video_btn_not_pressed))
+                photoBtn.isEnabled = true
             }
         }
     }
@@ -83,15 +98,16 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.main_activity)
 
-        val outputDir = cacheDir // context being the Activity pointer
+        val outputDir = filesDir // context being the Activity pointer
         val outputFile: File? = try {
             File.createTempFile("prefix", ".jpg", outputDir)
         } catch (ex: IOException) {
-            Log.d(TAG, "Create output file error: " + ex.message)
+            log("Create output file error: " + ex.message)
             null
         }
 
-        findViewById<View>(R.id.customCameraActivity_takePhoto).setOnClickListener { cameraController!!.takePhoto() }
+        photoBtn = findViewById<View>(R.id.customCameraActivity_takePhoto) as ImageView
+        photoBtn.setOnClickListener { cameraController!!.takePhoto() }
 
         videoBtn = findViewById<View>(R.id.customCameraActivity_takeVideo) as ImageView
         videoBtn.setOnClickListener { cameraController!!.makeVideo() }
@@ -100,7 +116,8 @@ class MainActivity : AppCompatActivity() {
         focusIndicator = findViewById(R.id.customCameraActivity_focusIndicator)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            Log.d(TAG, "camera2 selected")
+            log("camera2 selected")
+
             this.cameraController = Camera2Controller(
                     this,
                     cameraControllerCallback,
@@ -109,7 +126,8 @@ class MainActivity : AppCompatActivity() {
                     findViewById(R.id.customCameraActivity_textureView),
                     videoButtonCallback)
         } else {
-            Log.d(TAG, "camera1 selected")
+            log("camera1 selected")    //TODO check Camera1Controller
+
             this.cameraController = com.example.RxCameraBasic.rxcamera.Camera1Controller(
                     this,
                     cameraControllerCallback,
@@ -120,6 +138,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    //TODO checkPermission
     /* private fun checkPermission(): Boolean {
          if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
              return true
@@ -146,7 +165,11 @@ class MainActivity : AppCompatActivity() {
     }*/
 
     companion object {
-        private val TAG = MainActivity::class.java.name
+        private val TAG = "RxCameraBasic:"
+
+        fun log(msg: String) {
+            Log.d(TAG, msg)
+        }
 
         //private val REQUEST_PERMISSIONS = arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE)
 

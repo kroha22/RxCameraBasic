@@ -14,7 +14,6 @@ import android.util.Pair
 import android.view.Surface
 import com.example.RxCameraBasic.AutoFitTextureView
 import com.example.RxCameraBasic.CameraControllerBase
-import com.example.RxCameraBasic.rxcamera2.CameraOrientationHelper
 import com.example.RxCameraBasic.rxcamera2.ConvergeWaiter
 import com.example.RxCameraBasic.rxcamera2.OpenCameraException
 import io.reactivex.Observable
@@ -80,7 +79,7 @@ class Camera1Controller(private val context: Context,
                 Observable.combineLatest(previewObservable, onShutterClick, BiFunction { camera: CameraWrap, _: Any -> camera })
                         .firstElement().toObservable()
                         .observeOn(Schedulers.io())
-                        .flatMap { camera -> CameraRxWrapper.TakePictureRequest(camera, { showLog("Captured!") }, true, 480, 640, ImageFormat.JPEG, true).get() }
+                        .flatMap { camera -> CameraRxWrapper.TakePictureRequest(camera, { log("Captured!") }, true, 480, 640, ImageFormat.JPEG, true).get() }
                         .flatMap { cameraData -> ImageSaverRxWrapper.getBitmap(cameraData) }
                         .flatMap { bitmap -> ImageSaverRxWrapper.save(bitmap, file) }
                         .subscribe({ file -> callback.onPhotoTaken(file.absolutePath) }, { this.onError(it) })
@@ -98,7 +97,7 @@ class Camera1Controller(private val context: Context,
         // реакция на onPause
         compositeDisposable.add(Observable.combineLatest(previewObservable, onPauseSubject, BiFunction { camera: CameraWrap, _: Any -> camera })
                 .firstElement().toObservable()
-                .doOnNext { _ -> showLog("\ton pause") }
+                .doOnNext { _ -> log("\ton pause") }
                 .doOnNext { cam -> cam.onSurfaceDestroy() }
                 .doOnNext { _ -> closeCamera() }
                 .doOnNext { _ -> closeMediaRecorder() }
@@ -109,7 +108,7 @@ class Camera1Controller(private val context: Context,
         // реакция на onStartVideo
         compositeDisposable.add(Observable.combineLatest(previewObservable, onStartVideoClick, BiFunction { camera: CameraWrap, _: Any -> camera })
                 .firstElement().toObservable()
-                .doOnNext { showLog("\ton start video") }
+                .doOnNext { log("\ton start video") }
                 .doOnNext { setUpMediaRecorder() }
                 .doOnNext {
                     setVideoBtnState(true)
@@ -121,7 +120,7 @@ class Camera1Controller(private val context: Context,
         // реакция на onStopVideo
         compositeDisposable.add(Observable.combineLatest(previewObservable, onStopVideoClick, BiFunction { camera: CameraWrap, _: Any -> camera })
                 .firstElement().toObservable()
-                .doOnNext { _ -> showLog("\ton stop video") }
+                .doOnNext { _ -> log("\ton stop video") }
                 .doOnNext { _ ->
                     setVideoBtnState(false)
                     stopRecordingVideo()
@@ -132,7 +131,7 @@ class Camera1Controller(private val context: Context,
     }
 
     private fun stopRecordingVideo() {
-        /*DEBUG*/showLog("\tstopRecordingVideo")
+        /*DEBUG*/log("\tstopRecordingVideo")
         if (mediaRecorder != null) {
             setVideoBtnState(false)
             mediaRecorder!!.stop()
@@ -145,7 +144,7 @@ class Camera1Controller(private val context: Context,
     }
 
     private fun setupVideoSurfaces(): Surface {
-        /*DEBUG*/showLog("\tsetupVideoSurfaces")
+        /*DEBUG*/log("\tsetupVideoSurfaces")
         val texture = textureView.surfaceTexture.apply {
             val previewSize = camera!!.parameters.previewSize
             setDefaultBufferSize(previewSize.width, previewSize.height)
@@ -155,7 +154,7 @@ class Camera1Controller(private val context: Context,
     }
 
     private fun setUpMediaRecorder() {
-        /*DEBUG*/showLog("\tsetUpMediaRecorder")
+        /*DEBUG*/log("\tsetUpMediaRecorder")
 
         if (nextVideoAbsolutePath.isNullOrEmpty()) {
             nextVideoAbsolutePath = getVideoFilePath()
@@ -192,13 +191,13 @@ class Camera1Controller(private val context: Context,
     }
 
     private fun createVideoFile(): File {
-        /*DEBUG*/showLog("\tcreateVideoFile")
+        /*DEBUG*/log("\tcreateVideoFile")
         val pictures = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
         return File(pictures, "myvideo.3gp")
     }
 
     private fun closeCamera() {
-        /*DEBUG*/showLog("\tcloseCamera")
+        /*DEBUG*/log("\tcloseCamera")
         if (camera != null) {
             camera!!.closeCamera()
         }
@@ -206,7 +205,7 @@ class Camera1Controller(private val context: Context,
 
     @SuppressLint("Recycle")
     private fun setupSurface(surfaceTexture: SurfaceTexture) {
-        /*DEBUG*/showLog("\tsetupSurface")
+        /*DEBUG*/log("\tsetupSurface")
         if (cameraParams!= null) {//todo camera params
             surfaceTexture.setDefaultBufferSize(cameraParams!!.previewSize.width, cameraParams!!.previewSize.height)
         }
@@ -214,7 +213,7 @@ class Camera1Controller(private val context: Context,
     }
 
     private fun configCamera(): CameraCharacteristics {
-        /*DEBUG*/showLog("\tconfigCamera")
+        /*DEBUG*/log("\tconfigCamera")
 
         return CameraCharacteristics.Builder()
                 .useBackCamera()
@@ -226,7 +225,7 @@ class Camera1Controller(private val context: Context,
     }
 
     private fun getCameraParams(cameraParameters: Camera.Parameters): CameraParams {
-        /*DEBUG*/showLog("\tgetCameraParams")
+        /*DEBUG*/log("\tgetCameraParams")
 
         val videoSize = CameraStrategy.chooseVideoSize(cameraParameters.supportedVideoSizes)
         val previewSize = CameraStrategy.chooseOptimalSize(
@@ -240,7 +239,7 @@ class Camera1Controller(private val context: Context,
     }
 
     private fun bindTexture(rxCamera: CameraWrap): Observable<CameraWrap> {
-        /*DEBUG*/showLog("\tbindTexture")
+        /*DEBUG*/log("\tbindTexture")
 
         rxCamera.onSurfaceAvailable()
 
@@ -256,7 +255,7 @@ class Camera1Controller(private val context: Context,
     }
 
     private fun onError(throwable: Throwable) {
-        /*DEBUG*/showLog("\tonError"+throwable.message)
+        /*DEBUG*/log("\tonError"+throwable.message)
         unsubscribe()
         when (throwable) {
             //todo ??? is CameraAccessException -> callback.onCameraAccessException()
@@ -268,40 +267,40 @@ class Camera1Controller(private val context: Context,
      * successive camera preview frame data
      */
     private fun requestSuccessiveData(camera: CameraWrap): Disposable? {
-        return CameraRxWrapper.SuccessiveDataRequest(camera).get().subscribe { rxCameraData -> showLog("successiveData, cameraData.length: " + rxCameraData.cameraData!!.size) }
+        return CameraRxWrapper.SuccessiveDataRequest(camera).get().subscribe { rxCameraData -> log("successiveData, cameraData.length: " + rxCameraData.cameraData!!.size) }
     }
     /**
      * only one shot camera data, encapsulated the setOneShotPreviewCallback
      */
     private fun requestOneShot(camera: CameraWrap): Disposable? {
-        return CameraRxWrapper.TakeOneShotRequest(camera).get().subscribe { rxCameraData -> showLog("one shot request, cameraData.length: " + rxCameraData.cameraData!!.size) }
+        return CameraRxWrapper.TakeOneShotRequest(camera).get().subscribe { rxCameraData -> log("one shot request, cameraData.length: " + rxCameraData.cameraData!!.size) }
     }
     /**
      * periodic camera preview frame data
      * intervalMills the interval of the preview frame data will return, in millseconds
      */
     private fun requestPeriodicData(camera: CameraWrap): Disposable? {
-        return CameraRxWrapper.PeriodicDataRequest(camera, 1000).get().subscribe { rxCameraData -> showLog("periodic request, cameraData.length: " + rxCameraData.cameraData!!.size) }
+        return CameraRxWrapper.PeriodicDataRequest(camera, 1000).get().subscribe { rxCameraData -> log("periodic request, cameraData.length: " + rxCameraData.cameraData!!.size) }
     }
 
     private fun actionZoom(camera: CameraWrap): Disposable? {
         return execute (camera) { cam -> cam.zoom(10)}
-                .subscribe({ rxCamera -> showLog("zoom success: $rxCamera") }, { e -> showLog("zoom error: " + e.message) })
+                .subscribe({ rxCamera -> log("zoom success: $rxCamera") }, { e -> log("zoom error: " + e.message) })
     }
 
     private fun actionSmoothZoom(camera: CameraWrap): Disposable? {
         return execute (camera) { cam -> cam.smoothZoom(10)}
-                .subscribe({ rxCamera -> showLog("zoom success: $rxCamera") }, { e -> showLog("zoom error: " + e.message) })
+                .subscribe({ rxCamera -> log("zoom success: $rxCamera") }, { e -> log("zoom error: " + e.message) })
     }
 
     private fun actionOpenFlash(camera: CameraWrap): Disposable? {
         return execute (camera) { cam -> cam.flashAction(true)}
-                .subscribe({ rxCamera -> showLog("open flash: $rxCamera") }, { e -> showLog("open flash error: " + e.message) })
+                .subscribe({ rxCamera -> log("open flash: $rxCamera") }, { e -> log("open flash error: " + e.message) })
     }
 
     private fun actionCloseFlash(camera: CameraWrap): Disposable? {
         return execute (camera) { cam -> cam.flashAction(false)}
-                .subscribe({ rxCamera -> showLog("close flash: $rxCamera") }, { e -> showLog("close flash error: " + e.message) })
+                .subscribe({ rxCamera -> log("close flash: $rxCamera") }, { e -> log("close flash error: " + e.message) })
     }
 
     private fun execute(camera: CameraWrap, action: (CameraWrap) -> Unit): Observable<CameraWrap> {
@@ -316,7 +315,7 @@ class Camera1Controller(private val context: Context,
     }
 
     private fun switchCamera(camera: CameraWrap): Observable<CameraWrap> {
-        /*DEBUG*/showLog("\tswitchCamera")
+        /*DEBUG*/log("\tswitchCamera")
         return Observable.create { emitter ->
 
             try {
@@ -333,14 +332,14 @@ class Camera1Controller(private val context: Context,
 
                 nativeCamera.startPreviewInternal()
 
-                showLog("\tswitchCamera - success")
+                log("\tswitchCamera - success")
                 if (!emitter.isDisposed) {
                     emitter.onNext(nativeCamera)
                     emitter.onComplete()
                 }
 
             } catch (e: Exception) {
-                showLog("\tswitchCamera - onError")
+                log("\tswitchCamera - onError")
 
                 if (!emitter.isDisposed) {
                     emitter.onError(OpenCameraFailedException(Exception(), OpenCameraFailedException.Reason.OPEN_FAILED, ""))//todo???
