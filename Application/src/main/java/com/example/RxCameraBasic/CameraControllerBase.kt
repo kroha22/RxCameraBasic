@@ -7,7 +7,6 @@ import android.arch.lifecycle.LifecycleOwner
 import android.content.Context
 import android.graphics.SurfaceTexture
 import android.media.MediaRecorder
-import android.util.Log
 import android.view.Surface
 import android.view.TextureView
 import io.reactivex.disposables.CompositeDisposable
@@ -21,6 +20,56 @@ abstract class CameraControllerBase(private val context: Context,
                                            lifecycle: Lifecycle,
                                            private val textureView: AutoFitTextureView,
                                            private val videoButtonCallback: VideoButtonCallback) {
+
+    //----------------------------------------------------------------------------------------------
+
+    companion object {
+
+        private val TAG = CameraControllerBase::class.java.name
+
+        internal fun log(msg: String) {
+            MainActivity.log("$TAG: $msg")
+        }
+
+        internal fun contains(modes: IntArray?, mode: Int): Boolean {
+            if (modes == null) {
+                return false
+            }
+            for (i in modes) {
+                if (i == mode) {
+                    return true
+                }
+            }
+            return false
+        }
+    }
+    //----------------------------------------------------------------------------------------------
+
+    interface Callback {
+
+        fun showWaitView()
+
+        fun hideWaitView()
+
+        fun showFocusStarted()
+
+        fun showFocusFinished()
+
+        fun showMessage(msg: String)
+
+        fun onPhotoTaken(photoUrl: String)
+
+        fun onVideoTaken(videoUrl: String)
+
+        fun showError(error: String)
+
+    }
+    //----------------------------------------------------------------------------------------------
+
+    interface VideoButtonCallback {
+        fun onClick(isPressed:Boolean)
+    }
+    //----------------------------------------------------------------------------------------------
 
     val file: File = File(photoFileUrl)
 
@@ -82,7 +131,7 @@ abstract class CameraControllerBase(private val context: Context,
     }
 
     fun makeVideo() {
-        log("onVideoClick")
+        log("onVideoClick, isRecordingVideo = $isRecordingVideo")
         
         if (isRecordingVideo) onStopVideoClick.onNext(this) else onStartVideoClick.onNext(this)
     }
@@ -126,17 +175,6 @@ abstract class CameraControllerBase(private val context: Context,
         videoButtonCallback.onClick(isPressed)
     }
 
-    internal fun getVideoFilePath(): String {
-        val filename = "${System.currentTimeMillis()}.mp4"
-        val dir = context.getExternalFilesDir(null)
-
-        return if (dir == null) {
-            filename
-        } else {
-            "${dir.absolutePath}/$filename"
-        }
-    }
-
     fun initSurfaceTextureListener() {
         textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
 
@@ -172,53 +210,5 @@ abstract class CameraControllerBase(private val context: Context,
             }
         }
     }
-
-    //----------------------------------------------------------------------------------------------
-
-    companion object {
-
-        private val TAG = CameraControllerBase::class.java.name
-
-        internal fun log(msg: String) {
-            MainActivity.log("$TAG: $msg")
-        }
-
-        internal fun contains(modes: IntArray?, mode: Int): Boolean {
-            if (modes == null) {
-                return false
-            }
-            for (i in modes) {
-                if (i == mode) {
-                    return true
-                }
-            }
-            return false
-        }
-    }
-    //----------------------------------------------------------------------------------------------
-
-    interface Callback {
-        fun onFocusStarted()
-
-        fun onFocusFinished()
-
-        fun onMessage(msg: String)
-
-        fun onPhotoTaken(photoUrl: String)
-
-        fun onVideoTaken(videoUrl: String)
-
-        fun onCameraAccessException()
-
-        fun onCameraOpenException(exception: Exception)
-
-        fun onException(throwable: Throwable)
-    }
-    //----------------------------------------------------------------------------------------------
-
-    interface VideoButtonCallback {
-        fun onClick(isPressed:Boolean)
-    }
-    //----------------------------------------------------------------------------------------------
 
 }

@@ -14,6 +14,7 @@ import android.util.Pair
 import android.view.Surface
 import com.example.RxCameraBasic.AutoFitTextureView
 import com.example.RxCameraBasic.CameraControllerBase
+import com.example.RxCameraBasic.MainActivity.Companion.getVideoFilePath
 import com.example.RxCameraBasic.rxcamera2.ConvergeWaiter
 import com.example.RxCameraBasic.rxcamera2.OpenCameraException
 import io.reactivex.Observable
@@ -124,6 +125,8 @@ class Camera1Controller(private val context: Context,
                 .doOnNext { _ ->
                     setVideoBtnState(false)
                     stopRecordingVideo()
+                    camera!!.nativeCamera.lock()
+
                     setupSurface(textureView.surfaceTexture)
                 }
                 .subscribe({ _ -> unsubscribe() }, { this.onError(it) })
@@ -138,7 +141,7 @@ class Camera1Controller(private val context: Context,
             closeMediaRecorder()
         }
 
-        callback.onMessage("Video saved: $nextVideoAbsolutePath")
+        callback.showMessage("Video saved: $nextVideoAbsolutePath")
 
         nextVideoAbsolutePath = null
     }
@@ -166,10 +169,10 @@ class Camera1Controller(private val context: Context,
 
         mediaRecorder?.apply {
             setCamera(camera!!.nativeCamera)
-            setVideoSource(MediaRecorder.VideoSource.CAMERA)//todo??SURFACE
             setAudioSource(MediaRecorder.AudioSource.CAMCORDER)//todo??MIC
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setVideoSource(MediaRecorder.VideoSource.CAMERA)//todo??SURFACE
             setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH))
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setOutputFile(nextVideoAbsolutePath)
 
             /*todo??? val rotation = windowManager.defaultDisplay.rotation
@@ -258,11 +261,24 @@ class Camera1Controller(private val context: Context,
         /*DEBUG*/log("\tonError"+throwable.message)
         unsubscribe()
         when (throwable) {
-            //todo ??? is CameraAccessException -> callback.onCameraAccessException()
-            is OpenCameraException -> callback.onCameraOpenException(throwable)
-            else -> callback.onException(throwable)
+            //todo ??? is CameraAccessException -> callback.showCameraAccessException()
+            is OpenCameraException -> onCameraOpenException(throwable)
+            else -> onException(throwable)
         }
     }
+
+    private fun onException(throwable: Throwable) {
+        log("Camera Exception: " + throwable.message)
+
+        callback.showError("Ошибка приложения. ${throwable.message}")
+    }
+
+    private fun onCameraOpenException(exception: OpenCameraException) {
+        log("Camera Open Exception: reason ${exception.reason}:" + exception.message)
+
+        callback.showError("Ошибка при открытии камеры.")
+    }
+
     /**
      * successive camera preview frame data
      */
