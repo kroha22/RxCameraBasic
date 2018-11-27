@@ -25,14 +25,15 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
     //-----------------------------------------------------------------------------------------------
     companion object {
+        private const val APP_MEDIA_DIRECTORY_NAME = "RxCameraBasic"
+        private const val REQUEST_PERMISSION_CODE = 233
+        private const val TAG = "RxCameraBasic:"
 
-        val APP_MEDIA_DIRECTORY_NAME = "RxCameraBasic"
-
-        private val REQUEST_PERMISSIONS = arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-
-        private val REQUEST_PERMISSION_CODE = 233
-
-        private val TAG = "RxCameraBasic:"
+        private val REQUEST_PERMISSIONS = arrayOf(
+                Manifest.permission.CAMERA,
+                Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+        )
 
         fun log(msg: String) {
             Log.d(TAG, msg)
@@ -41,13 +42,13 @@ class MainActivity : AppCompatActivity() {
         fun getVideoFilePath(): String? {
             val mediaStorageDir = getMediaStorageDir() ?: return null
 
-            return mediaStorageDir.getPath() + File.separator + "VID_" + getTimeStamp() + ".mp4"
+            return mediaStorageDir.path + File.separator + "VID_" + getTimeStamp() + ".mp4"
         }
 
         fun getOutputPhotoFile():File? {
             val mediaStorageDir = getMediaStorageDir() ?: return null
             return try {
-                File(mediaStorageDir.getPath() + File.separator + "PHOTO_" + getTimeStamp() + ".jpg")
+                File(mediaStorageDir.path + File.separator + "PHOTO_" + getTimeStamp() + ".jpg")
             } catch (ex: IOException) {
                 log("Create output file error: " + ex.message)
                 null
@@ -137,10 +138,10 @@ class MainActivity : AppCompatActivity() {
         override fun onClick(isPressed: Boolean) {
             if (isPressed) {
                 videoBtn.setColorFilter(ContextCompat.getColor(this@MainActivity, R.color.video_btn_pressed))
-                photoBtn.isEnabled = false
+                photoBtn.visibility = View.GONE
             } else {
                 videoBtn.setColorFilter(ContextCompat.getColor(this@MainActivity, R.color.video_btn_not_pressed))
-                photoBtn.isEnabled = true
+                photoBtn.visibility = View.VISIBLE
             }
         }
     }

@@ -62,7 +62,7 @@ class Camera2Controller(context: Context,
         }
     }
 
-    override fun subscribe() {//todo check return from photo
+    override fun subscribe() {//todo check photo after video? video after photo
         super.subscribe()
 
         // Открываем камеру после того, как SurfaceTexture готов к использованию.
@@ -108,9 +108,7 @@ class Camera2Controller(context: Context,
 
         // Observable, сигнализирующий об успешном закрытии сессии
         val captureSessionClosedObservable = createCaptureSessionObservable
-                .filter { pair ->
-                    pair.first === CameraRxWrapper.CaptureSessionStateEvents.ON_CLOSED 
-                }
+                .filter { pair -> pair.first === CameraRxWrapper.CaptureSessionStateEvents.ON_CLOSED }
                 .map { pair -> pair.second }
                 .doOnNext { log("session closed, is video session = $isRecordingVideo") }
                 .share()
@@ -129,7 +127,6 @@ class Camera2Controller(context: Context,
                         .flatMap { t1 -> this.waitForAf(t1) }
                         .flatMap { t2 -> this.waitForAe(t2) }
                         .doOnNext { _ -> callback.showFocusFinished() }
-                        .doOnNext { callback.showWaitView() }
                         .flatMap { captureSessionData -> captureStillPicture(captureSessionData.session) }
                         .subscribe({ _ -> }, { this.onError(it) })
         )
@@ -176,10 +173,7 @@ class Camera2Controller(context: Context,
                 .doOnNext { closeCaptureSession(it) }
                 .flatMap { _ -> captureSessionClosedObservable }
                 .doOnNext { _ -> setVideoBtnState(true) }
-                .subscribe({ captureSession ->
-                    log("video session must be created")
-                    recreateSession(captureSession.device, closeCameraObservable)
-                }, { this.onError(it) })
+                .subscribe({ captureSession -> recreateSession(captureSession.device, closeCameraObservable) }, { this.onError(it) })
         )
 
         // реакция на onStopVideo
@@ -187,14 +181,15 @@ class Camera2Controller(context: Context,
                 .firstElement().toObservable()
                 .doOnNext { _ -> log("on stop video") }
                 .doOnNext { callback.showWaitView() }
+                .doOnNext { captureSessionData ->
+                    captureSessionData.session.stopRepeating()
+                    captureSessionData.session.abortCaptures()
+                }
                 .flatMap { stopRecordingVideo(it) }
-                .doOnNext { closeCaptureSession(it) } //todo ???
+                .doOnNext { closeCaptureSession(it) }
                 .flatMap { _ -> captureSessionClosedObservable }
                 .doOnNext { _ -> setVideoBtnState(false) }
-                .subscribe({ captureSession ->
-                    log("!!!!!video session stopped, new session must be created")
-                    recreateSession(captureSession.device, closeCameraObservable)
-                }, { this.onError(it) })
+                .subscribe({ captureSession -> recreateSession(captureSession.device, closeCameraObservable) }, { this.onError(it) })
         )
 
         if (isRecordingVideo) {
@@ -240,12 +235,12 @@ class Camera2Controller(context: Context,
     private fun switchCameraInternal() {
         try {
             unsubscribe()
+
             val cameraId = CameraStrategy.switchCamera(cameraManager, cameraParams!!.cameraId)
             cameraParams = getCameraParams(cameraId!!)
             subscribe()
 
             onSurfaceTextureAvailable.onNext(textureView.surfaceTexture)
-            // waiting for textureView to be measured
         } catch (e: CameraAccessException) {
             onError(e)
         }
@@ -278,17 +273,14 @@ class Camera2Controller(context: Context,
         log("stop recording video")
 
         return Observable.create<CaptureSessionData> {
-
-            stopRecordingVideo()
-
+            stopRecordingVideo() //todo fix save
             it.onNext(sessionData)
         }
-                .doOnNext { }
                 .doOnNext {
                     log("Video saved: $nextVideoAbsolutePath")
                     nextVideoAbsolutePath = null
                 }
-                .share()//todo???
+                .share()
     }
 
     private fun stopRecordingVideo() {
@@ -339,7 +331,7 @@ class Camera2Controller(context: Context,
         compositeDisposable.add(
                 ImageSaverRxWrapper.createOnImageAvailableObservable(imageReader!!)
                         .observeOn(Schedulers.io())
-                        .flatMap { imageReader -> ImageSaverRxWrapper.save(imageReader.acquireLatestImage(), file).toObservable() }
+                        .flatMap { imageReader -> ImageSaverRxWrapper.save(imageReader.acquireLatestImage(), file).toObservable() }//todo fix save
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribe { file -> callback.onPhotoTaken(file.absolutePath) }
         )
@@ -404,9 +396,6 @@ class Camera2Controller(context: Context,
         builder.addTarget(mediaRecorder!!.surface)
         setup3Auto(cameraParams, builder)
 
-        val rotation = windowManager.defaultDisplay.rotation
-        builder.set(CaptureRequest.JPEG_ORIENTATION, CameraOrientationHelper.getJpegOrientation(cameraParams.cameraCharacteristics, rotation))
-
         return builder
     }
 
@@ -420,6 +409,7 @@ class Camera2Controller(context: Context,
 
         val rotation = windowManager.defaultDisplay.rotation
         builder.set(CaptureRequest.JPEG_ORIENTATION, CameraOrientationHelper.getJpegOrientation(cameraParams!!.cameraCharacteristics, rotation))
+
         return builder
     }
 
