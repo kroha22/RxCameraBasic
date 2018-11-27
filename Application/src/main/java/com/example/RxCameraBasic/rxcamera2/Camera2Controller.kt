@@ -108,7 +108,9 @@ class Camera2Controller(context: Context,
 
         // Observable, сигнализирующий об успешном закрытии сессии
         val captureSessionClosedObservable = createCaptureSessionObservable
-                .filter { pair -> pair.first === CameraRxWrapper.CaptureSessionStateEvents.ON_CLOSED }
+                .filter { pair ->
+                    pair.first === CameraRxWrapper.CaptureSessionStateEvents.ON_CLOSED 
+                }
                 .map { pair -> pair.second }
                 .doOnNext { log("session closed, is video session = $isRecordingVideo") }
                 .share()
@@ -186,8 +188,7 @@ class Camera2Controller(context: Context,
                 .doOnNext { _ -> log("on stop video") }
                 .doOnNext { callback.showWaitView() }
                 .flatMap { stopRecordingVideo(it) }
-                .observeOn(AndroidSchedulers.mainThread()) //todo threads???
-                .doOnNext { closeCaptureSession(it) } //todo threads???
+                .doOnNext { closeCaptureSession(it) } //todo ???
                 .flatMap { _ -> captureSessionClosedObservable }
                 .doOnNext { _ -> setVideoBtnState(false) }
                 .subscribe({ captureSession ->
@@ -277,6 +278,7 @@ class Camera2Controller(context: Context,
         log("stop recording video")
 
         return Observable.create<CaptureSessionData> {
+
             stopRecordingVideo()
 
             it.onNext(sessionData)
