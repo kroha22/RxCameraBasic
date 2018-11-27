@@ -23,7 +23,7 @@ class ShowPhotoActivity : AppCompatActivity() {
         Picasso.get()
                 .load(File(photoUrl))
                 .memoryPolicy(MemoryPolicy.NO_CACHE, MemoryPolicy.NO_STORE)
-                .placeholder(R.drawable.ic_adb_black_24dp)
+                .placeholder(R.drawable.ic_image_gray_24dp)
                 .error(R.drawable.ic_error_outline_black_24dp)
                 .into(mPhotoView)
     }

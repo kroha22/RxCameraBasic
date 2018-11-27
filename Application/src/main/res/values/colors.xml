@@ -3,6 +3,7 @@
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#FF4081</color>
+
     <color name="shutter_bg">#9aacb3</color>
     <color name="photo_btn_color">#2c3436</color>
     <color name="video_btn_pressed">#bea8a8</color>
@@ -10,5 +11,6 @@
 
     <color name="ic_launcher_background">#E3A275</color>
     <color name="colorBlack">#020202</color>
+    <color name="colorShadow">#d5494949</color>
 
 </resources>
