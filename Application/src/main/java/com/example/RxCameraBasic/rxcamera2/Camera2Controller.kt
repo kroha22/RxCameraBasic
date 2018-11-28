@@ -24,6 +24,7 @@ import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.PublishSubject
 import java.io.IOException
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 @TargetApi(21)
 class Camera2Controller(context: Context,
@@ -62,7 +63,7 @@ class Camera2Controller(context: Context,
         }
     }
 
-    override fun subscribe() {//todo check photo after video? video after photo
+    override fun subscribe() {
         super.subscribe()
 
         // Открываем камеру после того, как SurfaceTexture готов к использованию.
@@ -122,73 +123,81 @@ class Camera2Controller(context: Context,
         compositeDisposable.add(
                 Observable.combineLatest(previewObservable, onShutterClick, BiFunction { captureSessionData: CaptureSessionData, _: Any -> captureSessionData })
                         .firstElement().toObservable()
-                        .doOnNext { _ -> log("on shutter click") }
-                        .doOnNext { _ -> callback.showFocusStarted() }
+                        .doOnNext { log("on shutter click") }
+                        .doOnNext { callback.showFocusStarted() }
                         .flatMap { t1 -> this.waitForAf(t1) }
                         .flatMap { t2 -> this.waitForAe(t2) }
-                        .doOnNext { _ -> callback.showFocusFinished() }
+                        .doOnNext { callback.showFocusFinished() }
+                        .doOnNext { callback.showWaitView() }
                         .flatMap { captureSessionData -> captureStillPicture(captureSessionData.session) }
-                        .subscribe({ _ -> }, { this.onError(it) })
+                        .subscribe({ }, { this.onError(it) })
         )
 
         // реакция на изменение камеры
         compositeDisposable.add(
                 Observable.combineLatest(previewObservable, onSwitchCameraClick, BiFunction { captureSessionData: CaptureSessionData, _: Any -> captureSessionData })
                         .firstElement().toObservable()
-                        .doOnNext { _ -> log("on switch camera click") }
+                        .doOnNext { log("on switch camera click") }
                         .doOnNext { callback.showWaitView() }
                         .doOnNext { closeCaptureSession(it) }
                         .flatMap { _ -> captureSessionClosedObservable }
                         .doOnNext { cameraCaptureSession -> cameraCaptureSession.device.close() }
                         .flatMap { _ -> closeCameraObservable }
-                        .doOnNext { _ -> closeImageReader() }
-                        .doOnNext { _ -> closeMediaRecorder() }
-                        .subscribe({ _ -> switchCameraInternal() }, { this.onError(it) })
+                        .doOnNext { closeImageReader() }
+                        .doOnNext { closeMediaRecorder() }
+                        .subscribe({ switchCameraInternal() }, { this.onError(it) })
         )
 
         // реакция на onPause
         compositeDisposable.add(Observable.combineLatest(previewObservable, onPauseSubject, BiFunction { state: CaptureSessionData, _: Any -> state })
                 .firstElement().toObservable()
-                .doOnNext { _ -> log("on pause") }
+                .doOnNext { log("on pause") }
                 .doOnNext { captureSessionData ->
-                    captureSessionData.session.stopRepeating()
-                    captureSessionData.session.abortCaptures()
+                    try {
+                        captureSessionData.session.stopRepeating()
+                        captureSessionData.session.abortCaptures()
+                    } catch (e: Exception) {
+                        log("onPause err: ${e.message}")
+                    }
                     captureSessionData.session.close()
                 }
                 .flatMap { _ -> captureSessionClosedObservable }
                 .doOnNext { cameraCaptureSession -> cameraCaptureSession.device.close() }
-                .doOnNext { _ -> surface?.release() }
                 .flatMap { _ -> closeCameraObservable }
-                .doOnNext { _ -> closeImageReader() }
-                .doOnNext { _ -> closeMediaRecorder() }
-                .subscribe({ _ -> unsubscribe() }, { this.onError(it) })
+                .doOnNext { closeImageReader() }
+                .doOnNext { closeMediaRecorder() }
+                .subscribe({ unsubscribe() }, { this.onError(it) })
         )
 
         // реакция на onStartVideo
         compositeDisposable.add(Observable.combineLatest(previewObservable, onStartVideoClick, BiFunction { state: CaptureSessionData, _: Any -> state })
                 .firstElement().toObservable()
-                .doOnNext { _ -> log("request start video") }
+                .doOnNext { log("request start video") }
                 .doOnNext { callback.showWaitView() }
                 .doOnNext { setUpMediaRecorder() }
                 .doOnNext { closeCaptureSession(it) }
                 .flatMap { _ -> captureSessionClosedObservable }
-                .doOnNext { _ -> setVideoBtnState(true) }
+                .doOnNext { setVideoBtnState(true) }
                 .subscribe({ captureSession -> recreateSession(captureSession.device, closeCameraObservable) }, { this.onError(it) })
         )
 
         // реакция на onStopVideo
         compositeDisposable.add(Observable.combineLatest(previewObservable, onStopVideoClick, BiFunction { state: CaptureSessionData, _: Any -> state })
                 .firstElement().toObservable()
-                .doOnNext { _ -> log("on stop video") }
+                .doOnNext { log("on stop video") }
                 .doOnNext { callback.showWaitView() }
                 .doOnNext { captureSessionData ->
-                    captureSessionData.session.stopRepeating()
-                    captureSessionData.session.abortCaptures()
+                    try {
+                        captureSessionData.session.stopRepeating()
+                        captureSessionData.session.abortCaptures()
+                    } catch (e: Exception) {
+                        log("onStopVideo err: ${e.message}")
+                    }
                 }
-                .flatMap { stopRecordingVideo(it) }
+                .doOnNext { stopRecordingVideo() }
                 .doOnNext { closeCaptureSession(it) }
                 .flatMap { _ -> captureSessionClosedObservable }
-                .doOnNext { _ -> setVideoBtnState(false) }
+                .doOnNext { setVideoBtnState(false) }
                 .subscribe({ captureSession -> recreateSession(captureSession.device, closeCameraObservable) }, { this.onError(it) })
         )
 
@@ -196,7 +205,7 @@ class Camera2Controller(context: Context,
             val recordingVideoRequest = PublishSubject.create<Any>()
             compositeDisposable.add(Observable.combineLatest(previewObservable, recordingVideoRequest, BiFunction { state: CaptureSessionData, _: Any -> state })
                     .firstElement().toObservable()
-                    .subscribe({ _ ->
+                    .subscribe({
                         if (isRecordingVideo) {
                             startRecordingVideo()
                         }
@@ -222,6 +231,15 @@ class Camera2Controller(context: Context,
         log("recreateSession")
 
         unsubscribe()
+
+        //todo ??
+        compositeDisposable.add(
+                ImageSaverRxWrapper.createOnImageAvailableObservable(imageReader!!)
+                        .observeOn(Schedulers.io())
+                        .flatMap { imageReader -> ImageSaverRxWrapper.save(imageReader.acquireLatestImage(), file).toObservable() }
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe { file -> callback.onPhotoTaken(file.absolutePath) }
+        )
 
         subscribeCaptureSession(Observable.create<CameraDevice> { emitter -> emitter.onNext(device) }.share(), closeCameraObservable)
     }
@@ -257,6 +275,7 @@ class Camera2Controller(context: Context,
         unsubscribe()
 
         when (throwable) {
+            is CameraRxWrapper.CameraCaptureFailedException -> onCameraCaptureFailedException(throwable)
             is CameraAccessException -> onCameraAccessException(throwable)
             is OpenCameraException -> onCameraOpenException(throwable)
             else -> onException(throwable)
@@ -269,21 +288,9 @@ class Camera2Controller(context: Context,
         mediaRecorder!!.start()
     }
 
-    private fun stopRecordingVideo(sessionData: CaptureSessionData): Observable<CaptureSessionData> {
+    private fun stopRecordingVideo() {
         log("stop recording video")
 
-        return Observable.create<CaptureSessionData> {
-            stopRecordingVideo() //todo fix save
-            it.onNext(sessionData)
-        }
-                .doOnNext {
-                    log("Video saved: $nextVideoAbsolutePath")
-                    nextVideoAbsolutePath = null
-                }
-                .share()
-    }
-
-    private fun stopRecordingVideo() {
         mediaRecorder!!.apply {
             try {
                 stop()
@@ -291,8 +298,11 @@ class Camera2Controller(context: Context,
                 callback.showMessage("Empty video")//todo???
             }
 
-            mediaRecorder!!.reset()
+            reset()
         }
+
+        log("Video saved: $nextVideoAbsolutePath")
+        nextVideoAbsolutePath = null
     }
 
     @Throws(IOException::class)
@@ -331,7 +341,7 @@ class Camera2Controller(context: Context,
         compositeDisposable.add(
                 ImageSaverRxWrapper.createOnImageAvailableObservable(imageReader!!)
                         .observeOn(Schedulers.io())
-                        .flatMap { imageReader -> ImageSaverRxWrapper.save(imageReader.acquireLatestImage(), file).toObservable() }//todo fix save
+                        .flatMap { imageReader -> ImageSaverRxWrapper.save(imageReader.acquireLatestImage(), file).toObservable() }
                         .observeOn(AndroidSchedulers.mainThread())
                         .subscribe { file -> callback.onPhotoTaken(file.absolutePath) }
         )
@@ -383,8 +393,10 @@ class Camera2Controller(context: Context,
     @Throws(CameraAccessException::class)
     private fun createPreviewBuilder(captureSession: CameraCaptureSession, cameraParams: CameraParams, previewSurface: Surface): CaptureRequest.Builder {
         val builder = captureSession.device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+
         builder.addTarget(previewSurface)
         setup3Auto(cameraParams, builder)
+
         return builder
     }
 
@@ -484,6 +496,12 @@ class Camera2Controller(context: Context,
         log("Camera Access Exception: " + exception.message)
 
         callback.showError("Ошибка при работе камеры")
+    }
+
+    private fun onCameraCaptureFailedException(exception: CameraRxWrapper.CameraCaptureFailedException) {
+        log("Camera Capture Failed Exception: ${exception.message}, ${exception.cause}")
+
+        callback.showError("Ошибка при работе камеры")//todo
     }
 
     private fun onCameraOpenException(exception: OpenCameraException) {

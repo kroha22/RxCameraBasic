@@ -235,7 +235,9 @@ object CameraRxWrapper {
             override fun onCaptureFailed(session: CameraCaptureSession,
                                          request: CaptureRequest,
                                          failure: CaptureFailure) {
-                if (!sesDataEmitter.isDisposed) {
+                log("onCaptureFailed failure $failure")
+
+                if (!sesDataEmitter.isDisposed) {//todo handle error
                     sesDataEmitter.onError(CameraCaptureFailedException(failure))
                 }
             }

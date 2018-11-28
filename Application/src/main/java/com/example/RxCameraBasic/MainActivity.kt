@@ -22,6 +22,7 @@ import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
 
+
 class MainActivity : AppCompatActivity() {
     //-----------------------------------------------------------------------------------------------
     companion object {
@@ -32,6 +33,7 @@ class MainActivity : AppCompatActivity() {
         private val REQUEST_PERMISSIONS = arrayOf(
                 Manifest.permission.CAMERA,
                 Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.READ_EXTERNAL_STORAGE ,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
         )
 
@@ -40,13 +42,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         fun getVideoFilePath(): String? {
-            val mediaStorageDir = getMediaStorageDir() ?: return null
+            val mediaStorageDir = getMediaStorageDir(Environment.DIRECTORY_MOVIES) ?: return null
 
             return mediaStorageDir.path + File.separator + "VID_" + getTimeStamp() + ".mp4"
         }
 
         fun getOutputPhotoFile():File? {
-            val mediaStorageDir = getMediaStorageDir() ?: return null
+            val mediaStorageDir = getMediaStorageDir(Environment.DIRECTORY_PICTURES) ?: return null
             return try {
                 File(mediaStorageDir.path + File.separator + "PHOTO_" + getTimeStamp() + ".jpg")
             } catch (ex: IOException) {
@@ -55,21 +57,17 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        private fun getMediaStorageDir(): File? {
+        private fun getMediaStorageDir(type: String): File? {
 
-            // External sdcard file location
-            val mediaStorageDir = File(Environment.getExternalStorageDirectory(), APP_MEDIA_DIRECTORY_NAME)
-
-            // Create storage directory if it does not exist
-            if (!mediaStorageDir.exists()) {
-                if (!mediaStorageDir.mkdirs()) {
-                    Log.d(TAG, "Oops! Failed create "
-                            + APP_MEDIA_DIRECTORY_NAME + " directory")
-                    return null
-                }
+            val dir = File(
+                    Environment.getExternalStoragePublicDirectory(type),
+                    APP_MEDIA_DIRECTORY_NAME)
+            if (!dir.exists() && !dir.mkdirs()) {
+                log( "save: error: can't create Pictures directory")
+                return null
             }
 
-            return mediaStorageDir
+            return dir
         }
 
         private fun getTimeStamp() = SimpleDateFormat("yyyyMMdd_HHmmss",
@@ -120,17 +118,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun showMessage(msg: String) {
-            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+            runOnUiThread{Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()}
         }
 
         override fun showError(error: String) {
-            setResult(Activity.RESULT_CANCELED)
+            runOnUiThread{
+                setResult(Activity.RESULT_CANCELED)
 
-            AlertDialog.Builder(this@MainActivity)
-                    .setMessage(error)
-                    .setPositiveButton("Закрыть") { _, _ -> this@MainActivity.finish() }
-                    .create()
-                    .show()
+                AlertDialog.Builder(this@MainActivity)
+                        .setMessage(error)
+                        .setPositiveButton("Закрыть") { _, _ -> this@MainActivity.finish() }
+                        .create()
+                        .show()
+            }
         }
     }
 
