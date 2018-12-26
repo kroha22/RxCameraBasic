@@ -1,4 +1,4 @@
-package com.example.RxCameraBasic
+package com.example.rxCameraBasic
 
 import android.content.Context
 import android.util.AttributeSet

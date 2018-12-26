@@ -1,6 +1,6 @@
 @file:Suppress("DEPRECATION")
 
-package com.example.RxCameraBasic.rxcamera
+package com.example.rxCameraBasic.rxcamera
 
 import android.content.Context
 import android.graphics.ImageFormat
@@ -12,8 +12,8 @@ import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.WindowManager
-import com.example.RxCameraBasic.rxcamera.CameraCharacteristics.CameraFacing
-import com.example.RxCameraBasic.rxcamera.CameraCharacteristics.CameraId
+import com.example.rxCameraBasic.rxcamera.CameraCharacteristics.CameraFacing
+import com.example.rxCameraBasic.rxcamera.CameraCharacteristics.CameraId
 import java.util.*
 
 object CameraStrategy {

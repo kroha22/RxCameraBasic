@@ -1,4 +1,4 @@
-package com.example.RxCameraBasic.rxcamera2
+package com.example.rxCameraBasic.rxcamera2
 
 import android.annotation.TargetApi
 import android.graphics.ImageFormat

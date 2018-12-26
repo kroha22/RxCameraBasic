@@ -1,10 +1,10 @@
-package com.example.RxCameraBasic.rxcamera2
+package com.example.rxCameraBasic.rxcamera2
 
 import android.annotation.TargetApi
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
-import com.example.RxCameraBasic.rxcamera2.CameraRxWrapper.CaptureSessionData
+import com.example.rxCameraBasic.rxcamera2.CameraRxWrapper.CaptureSessionData
 
 import java.util.Arrays
 import java.util.Collections

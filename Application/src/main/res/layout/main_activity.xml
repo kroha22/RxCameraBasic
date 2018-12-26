@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@color/colorBlack">
 
-    <com.example.RxCameraBasic.AutoFitTextureView
+    <com.example.rxCameraBasic.AutoFitTextureView
         android:id="@+id/customCameraActivity_textureView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"

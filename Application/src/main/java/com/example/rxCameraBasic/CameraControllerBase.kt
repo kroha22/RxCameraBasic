@@ -1,10 +1,9 @@
-package com.example.RxCameraBasic
+package com.example.rxCameraBasic
 
 import android.annotation.TargetApi
 import android.arch.lifecycle.DefaultLifecycleObserver
 import android.arch.lifecycle.Lifecycle
 import android.arch.lifecycle.LifecycleOwner
-import android.content.Context
 import android.graphics.SurfaceTexture
 import android.media.MediaRecorder
 import android.view.Surface
@@ -15,11 +14,10 @@ import java.io.File
 
 
 @TargetApi(21)
-abstract class CameraControllerBase(private val context: Context,
-                                           photoFileUrl: String,
-                                           lifecycle: Lifecycle,
-                                           private val textureView: AutoFitTextureView,
-                                           private val videoButtonCallback: VideoButtonCallback) {
+abstract class CameraControllerBase(photoFileUrl: String,
+                                    lifecycle: Lifecycle,
+                                    private val textureView: AutoFitTextureView,
+                                    private val videoButtonCallback: VideoButtonCallback) {
 
     //----------------------------------------------------------------------------------------------
 
@@ -74,7 +72,7 @@ abstract class CameraControllerBase(private val context: Context,
     val file: File = File(photoFileUrl)
 
     internal var mediaRecorder: MediaRecorder? = null
-    internal var nextVideoAbsolutePath: String? = null
+    internal var videoAbsolutePath: String? = null
     internal var isRecordingVideo = false
 
     internal val compositeDisposable = CompositeDisposable()

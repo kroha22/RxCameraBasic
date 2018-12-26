@@ -1,9 +1,10 @@
-package com.example.RxCameraBasic
+package com.example.rxCameraBasic
 
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.pm.PackageManager
+import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -15,8 +16,8 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
-import com.example.RxCameraBasic.rxcamera.Camera1Controller
-import com.example.RxCameraBasic.rxcamera2.Camera2Controller
+import com.example.rxCameraBasic.rxcamera.Camera1Controller
+import com.example.rxCameraBasic.rxcamera2.Camera2Controller
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -86,12 +87,17 @@ class MainActivity : AppCompatActivity() {
     private val cameraControllerCallback = object : CameraControllerBase.Callback {
 
         override fun onPhotoTaken(photoUrl: String) {
-            val intent = ShowPhotoActivity.IntentHelper.createIntent(this@MainActivity, photoUrl)
-            startActivity(intent)
+            MediaScannerConnection.scanFile(this@MainActivity, Array(1){photoUrl}, null)
+            { path, uri ->
+                log("Photo $uri saved to $path")
+                val intent = ShowPhotoActivity.IntentHelper.createIntent(this@MainActivity, photoUrl)
+                startActivity(intent)
+            }
         }
 
         override fun onVideoTaken(videoUrl: String) {
-            Toast.makeText(this@MainActivity, "Video saved: $videoUrl", Toast.LENGTH_SHORT).show()
+            MediaScannerConnection.scanFile(this@MainActivity, Array(1){videoUrl}, null)
+            { path, uri -> log("Video $uri saved to $path")}
         }
 
         override fun showWaitView() {

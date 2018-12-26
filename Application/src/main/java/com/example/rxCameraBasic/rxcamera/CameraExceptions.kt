@@ -1,4 +1,4 @@
-package com.example.RxCameraBasic.rxcamera
+package com.example.rxCameraBasic.rxcamera
 
 import java.lang.Exception
 

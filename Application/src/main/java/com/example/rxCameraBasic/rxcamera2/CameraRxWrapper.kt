@@ -1,11 +1,11 @@
-package com.example.RxCameraBasic.rxcamera2
+package com.example.rxCameraBasic.rxcamera2
 
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
 import android.hardware.camera2.*
 import android.util.Pair
 import android.view.Surface
-import com.example.RxCameraBasic.MainActivity
+import com.example.rxCameraBasic.MainActivity
 import io.reactivex.Observable
 import io.reactivex.ObservableEmitter
 
@@ -160,34 +160,10 @@ object CameraRxWrapper {
         }
     }
     //-----------------------------------------------------------------------------------------------
-
-    /**
-     * @see CameraCaptureSession.CaptureCallback
-     */
-    enum class CaptureSessionEvents {
-        ON_STARTED,
-        ON_PROGRESSED,
-        ON_COMPLETED,
-        ON_SEQUENCE_COMPLETED,
-        ON_SEQUENCE_ABORTED
-    }
-    //-----------------------------------------------------------------------------------------------
     /*
      Класс обертка для сессии CameraCaptureSession.
      */
-    class CaptureSessionData internal constructor(internal val event: CaptureSessionEvents,
-                                                  internal var session: CameraCaptureSession,
-                                                  internal val request: CaptureRequest,
-                                                  internal val result: CaptureResult){
-
-        fun setSession(session: CameraCaptureSession): Observable<CaptureSessionData>{
-            return Observable.create { this.session = session }
-        }
-
-        fun setRepeatingRequest(request: CaptureRequest): Observable<CaptureSessionData>{
-            return fromSetRepeatingRequest(session, request)
-        }
-    }
+    class CaptureSessionData internal constructor(internal val session: CameraCaptureSession, internal val result: CaptureResult)
     //-----------------------------------------------------------------------------------------------
 
     /*
@@ -228,16 +204,14 @@ object CameraRxWrapper {
                                             request: CaptureRequest,
                                             result: TotalCaptureResult) {
                 if (!sesDataEmitter.isDisposed) {
-                    sesDataEmitter.onNext(CaptureSessionData(CaptureSessionEvents.ON_COMPLETED, session, request, result))
+                    sesDataEmitter.onNext(CaptureSessionData(session, result))
                 }
             }
 
             override fun onCaptureFailed(session: CameraCaptureSession,
                                          request: CaptureRequest,
                                          failure: CaptureFailure) {
-                log("onCaptureFailed failure $failure")
-
-                if (!sesDataEmitter.isDisposed) {//todo handle error
+                if (!sesDataEmitter.isDisposed) {
                     sesDataEmitter.onError(CameraCaptureFailedException(failure))
                 }
             }

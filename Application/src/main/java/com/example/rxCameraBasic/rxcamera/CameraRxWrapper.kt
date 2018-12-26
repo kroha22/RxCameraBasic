@@ -1,14 +1,14 @@
 @file:Suppress("DEPRECATION")
 
-package com.example.RxCameraBasic.rxcamera
+package com.example.rxCameraBasic.rxcamera
 
 import android.content.Context
 import android.graphics.Matrix
 import android.hardware.Camera
 import android.util.Log
 import android.util.Pair
-import com.example.RxCameraBasic.rxcamera.CameraWrap.CameraData
-import com.example.RxCameraBasic.rxcamera.CameraWrap.OnCameraPreviewFrameCallback
+import com.example.rxCameraBasic.rxcamera.CameraWrap.CameraData
+import com.example.rxCameraBasic.rxcamera.CameraWrap.OnCameraPreviewFrameCallback
 import io.reactivex.Observable
 import io.reactivex.ObservableEmitter
 import io.reactivex.ObservableOnSubscribe

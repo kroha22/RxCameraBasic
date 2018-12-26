@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.RxCameraBasic">
+    package="com.example.rxCameraBasic">
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
@@ -16,7 +16,7 @@
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme">
 
-        <activity android:name="com.example.RxCameraBasic.MainActivity"
+        <activity android:name="com.example.rxCameraBasic.MainActivity"
             android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -24,7 +24,7 @@
             </intent-filter>
         </activity>
 
-        <activity android:name="com.example.RxCameraBasic.ShowPhotoActivity" />
+        <activity android:name="com.example.rxCameraBasic.ShowPhotoActivity" />
 
     </application>
 

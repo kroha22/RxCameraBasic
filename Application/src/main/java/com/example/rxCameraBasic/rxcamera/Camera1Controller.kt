@@ -1,4 +1,4 @@
-package com.example.RxCameraBasic.rxcamera
+package com.example.rxCameraBasic.rxcamera
 
 import android.annotation.SuppressLint
 import android.arch.lifecycle.Lifecycle
@@ -12,11 +12,11 @@ import android.media.MediaRecorder
 import android.os.Environment
 import android.util.Pair
 import android.view.Surface
-import com.example.RxCameraBasic.AutoFitTextureView
-import com.example.RxCameraBasic.CameraControllerBase
-import com.example.RxCameraBasic.MainActivity.Companion.getVideoFilePath
-import com.example.RxCameraBasic.rxcamera2.ConvergeWaiter
-import com.example.RxCameraBasic.rxcamera2.OpenCameraException
+import com.example.rxCameraBasic.AutoFitTextureView
+import com.example.rxCameraBasic.CameraControllerBase
+import com.example.rxCameraBasic.MainActivity.Companion.getVideoFilePath
+import com.example.rxCameraBasic.rxcamera2.ConvergeWaiter
+import com.example.rxCameraBasic.rxcamera2.OpenCameraException
 import io.reactivex.Observable
 import io.reactivex.disposables.Disposable
 import io.reactivex.functions.BiFunction
@@ -29,7 +29,7 @@ class Camera1Controller(private val context: Context,
                         photoFileUrl: String,
                         lifecycle: Lifecycle,
                         private val textureView: AutoFitTextureView,
-                        videoButtonCallback: VideoButtonCallback) : CameraControllerBase(context, photoFileUrl, lifecycle, textureView, videoButtonCallback) {
+                        videoButtonCallback: VideoButtonCallback) : CameraControllerBase(photoFileUrl, lifecycle, textureView, videoButtonCallback) {
 
     private var camera: CameraWrap? = null
 
@@ -141,9 +141,9 @@ class Camera1Controller(private val context: Context,
             closeMediaRecorder()
         }
 
-        callback.showMessage("Video saved: $nextVideoAbsolutePath")
+        callback.showMessage("Video saved: $videoAbsolutePath")
 
-        nextVideoAbsolutePath = null
+        videoAbsolutePath = null
     }
 
     private fun setupVideoSurfaces(): Surface {
@@ -159,8 +159,8 @@ class Camera1Controller(private val context: Context,
     private fun setUpMediaRecorder() {
         /*DEBUG*/log("\tsetUpMediaRecorder")
 
-        if (nextVideoAbsolutePath.isNullOrEmpty()) {
-            nextVideoAbsolutePath = getVideoFilePath()
+        if (videoAbsolutePath.isNullOrEmpty()) {
+            videoAbsolutePath = getVideoFilePath()
         }
 
         createVideoFile()//todo???
@@ -173,7 +173,7 @@ class Camera1Controller(private val context: Context,
             setVideoSource(MediaRecorder.VideoSource.CAMERA)//todo??SURFACE
             setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH))
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setOutputFile(nextVideoAbsolutePath)
+            setOutputFile(videoAbsolutePath)
 
             /*todo??? val rotation = windowManager.defaultDisplay.rotation
             when (cameraParams!!.sensorOrientation) {

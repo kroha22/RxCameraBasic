@@ -1,5 +1,6 @@
-package com.example.RxCameraBasic.rxcamera2
+package com.example.rxCameraBasic.rxcamera2
 
+import android.annotation.SuppressLint
 import android.annotation.TargetApi
 import android.arch.lifecycle.Lifecycle
 import android.content.Context
@@ -12,11 +13,13 @@ import android.util.Pair
 import android.util.Size
 import android.view.Surface
 import android.view.WindowManager
-import com.example.RxCameraBasic.AutoFitTextureView
-import com.example.RxCameraBasic.CameraControllerBase
-import com.example.RxCameraBasic.MainActivity.Companion.getVideoFilePath
-import com.example.RxCameraBasic.rxcamera2.CameraRxWrapper.CaptureSessionData
-import com.example.RxCameraBasic.rxcamera2.CameraRxWrapper.fromSetRepeatingRequest
+import com.example.rxCameraBasic.AutoFitTextureView
+import com.example.rxCameraBasic.CameraControllerBase
+import com.example.rxCameraBasic.MainActivity.Companion.getVideoFilePath
+import com.example.rxCameraBasic.rxcamera2.CameraRxWrapper.CameraCaptureFailedException
+import com.example.rxCameraBasic.rxcamera2.CameraRxWrapper.CaptureSessionData
+import com.example.rxCameraBasic.rxcamera2.CameraRxWrapper.CreateCaptureSessionException
+import com.example.rxCameraBasic.rxcamera2.CameraRxWrapper.fromSetRepeatingRequest
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.functions.BiFunction
@@ -24,7 +27,6 @@ import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.PublishSubject
 import java.io.IOException
 import java.util.*
-import java.util.concurrent.TimeUnit
 
 @TargetApi(21)
 class Camera2Controller(context: Context,
@@ -32,7 +34,7 @@ class Camera2Controller(context: Context,
                         photoFileUrl: String,
                         lifecycle: Lifecycle,
                         private val textureView: AutoFitTextureView,
-                        videoButtonCallback: VideoButtonCallback) : CameraControllerBase(context, photoFileUrl, lifecycle, textureView, videoButtonCallback) {
+                        videoButtonCallback: VideoButtonCallback) : CameraControllerBase(photoFileUrl, lifecycle, textureView, videoButtonCallback) {
 
     private val windowManager: WindowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val cameraManager: CameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -232,7 +234,6 @@ class Camera2Controller(context: Context,
 
         unsubscribe()
 
-        //todo ??
         compositeDisposable.add(
                 ImageSaverRxWrapper.createOnImageAvailableObservable(imageReader!!)
                         .observeOn(Schedulers.io())
@@ -264,6 +265,7 @@ class Camera2Controller(context: Context,
         }
     }
 
+    @SuppressLint("Recycle")
     private fun setupSurface(surfaceTexture: SurfaceTexture) {
         log("\tsetup surface")
 
@@ -275,9 +277,10 @@ class Camera2Controller(context: Context,
         unsubscribe()
 
         when (throwable) {
-            is CameraRxWrapper.CameraCaptureFailedException -> onCameraCaptureFailedException(throwable)
+            is CameraCaptureFailedException -> onCameraCaptureFailedException(throwable)
             is CameraAccessException -> onCameraAccessException(throwable)
             is OpenCameraException -> onCameraOpenException(throwable)
+            is CreateCaptureSessionException -> onCreateCaptureSessionException(throwable)
             else -> onException(throwable)
         }
     }
@@ -294,6 +297,8 @@ class Camera2Controller(context: Context,
         mediaRecorder!!.apply {
             try {
                 stop()
+
+                callback.onVideoTaken(videoAbsolutePath!!)
             } catch (e: Exception) {
                 callback.showMessage("Empty video")//todo???
             }
@@ -301,21 +306,21 @@ class Camera2Controller(context: Context,
             reset()
         }
 
-        log("Video saved: $nextVideoAbsolutePath")
-        nextVideoAbsolutePath = null
+        log("Video saved: $videoAbsolutePath")
+        videoAbsolutePath = null
     }
 
     @Throws(IOException::class)
     private fun setUpMediaRecorder() {
-        if (nextVideoAbsolutePath.isNullOrEmpty()) {
-            nextVideoAbsolutePath = getVideoFilePath()
+        if (videoAbsolutePath.isNullOrEmpty()) {
+            videoAbsolutePath = getVideoFilePath()
         }
 
         mediaRecorder!!.apply {
             setVideoSource(MediaRecorder.VideoSource.SURFACE)
             setAudioSource(MediaRecorder.AudioSource.CAMCORDER)//todo??MIC
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setOutputFile(nextVideoAbsolutePath)
+            setOutputFile(videoAbsolutePath)
 
             val rotation = windowManager.defaultDisplay.rotation
             when (cameraParams!!.sensorOrientation) {
@@ -326,7 +331,7 @@ class Camera2Controller(context: Context,
             }
 
             setVideoEncodingBitRate(10000000)
-            setVideoFrameRate(30)
+            setVideoFrameRate(20)
             setVideoSize(cameraParams!!.videoSize.width, cameraParams!!.videoSize.height)
             setVideoEncoder(MediaRecorder.VideoEncoder.H264)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -498,16 +503,22 @@ class Camera2Controller(context: Context,
         callback.showError("Ошибка при работе камеры")
     }
 
-    private fun onCameraCaptureFailedException(exception: CameraRxWrapper.CameraCaptureFailedException) {
-        log("Camera Capture Failed Exception: ${exception.message}, ${exception.cause}")
+    private fun onCameraCaptureFailedException(exception: CameraCaptureFailedException) {
+        log("Camera Capture Failed Exception: ${exception.message}, ${exception.cause}, failure reason ${exception.mFailure.reason}")
 
-        callback.showError("Ошибка при работе камеры")//todo
+        callback.showError("Ошибка при работе камеры")
     }
 
     private fun onCameraOpenException(exception: OpenCameraException) {
         log("Camera Open Exception: reason ${exception.reason}:" + exception.message)
 
-        callback.showError("Ошибка при открытии камеры.")
+        callback.showError("Ошибка при открытии камеры")
+    }
+
+    private fun onCreateCaptureSessionException(exception: CreateCaptureSessionException) {
+        log("Create Capture Session Exception: reason ${exception.session}:" + exception.message)
+
+        callback.showError("Ошибка сеанса работы камеры")
     }
 
     //--------------------------------------------------------------------------------------------------
