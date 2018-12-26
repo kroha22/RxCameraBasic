@@ -506,7 +506,9 @@ class Camera2Controller(context: Context,
     private fun onCameraCaptureFailedException(exception: CameraCaptureFailedException) {
         log("Camera Capture Failed Exception: ${exception.message}, ${exception.cause}, failure reason ${exception.mFailure.reason}")
 
-        callback.showError("Ошибка при работе камеры")
+        if (exception.mFailure.reason != CaptureFailure.REASON_FLUSHED) {
+            callback.showError("Ошибка при работе камеры")//todo ???? bug hear!!!
+        }
     }
 
     private fun onCameraOpenException(exception: OpenCameraException) {
